@@ -1,0 +1,41 @@
+name: Actualizar datos de indicadores
+
+on:
+  schedule:
+    # 13:00 UTC = 7:00 hora de Ciudad de México (CST) — el INEGI publica el 10 y el 25.
+    # Se corre un día después de cada fecha de publicación, por si hay retraso.
+    - cron: "0 13 11 * *"
+    - cron: "0 13 26 * *"
+  workflow_dispatch: {}   # permite lanzarlo a mano desde la pestaña Actions, para probar
+
+permissions:
+  contents: write   # necesario para que el robot pueda hacer commit del archivo actualizado
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Ejecutar el script de actualización
+        env:
+          INEGI_TOKEN: ${{ secrets.INEGI_TOKEN }}
+        run: python actualizar_datos.py
+
+      - name: Publicar el dato nuevo (si cambió)
+        run: |
+          git config user.name "Robot de indicadores-mx"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/datos.json
+          if git diff --cached --quiet; then
+            echo "No hubo cambios; no se publica nada nuevo."
+          else
+            git commit -m "Actualización automática de datos"
+            git push
+          fi

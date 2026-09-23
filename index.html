@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indicadores de México: ejemplo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;700&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f7f8; --ink: #17242b; --muted: #5b6b73; --line: #d5dde1;
+    --accent: #0b6e6e; --warn-bg: #fff3cd; --warn-ink: #5c4400;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #10181c; --ink: #e6eef1; --muted: #93a4ac; --line: #26343a;
+            --accent: #4cc2c2; --warn-bg: #3a2f0b; --warn-ink: #f3dc95; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 400 1rem/1.6 "Public Sans", system-ui, sans-serif; }
+  main { max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1, h2 { font-family: "Newsreader", Georgia, serif; line-height: 1.15; margin: 0; }
+  h1 { font-size: clamp(2rem, 5vw, 3.25rem); max-width: 18ch; }
+  h2 { font-size: 1.6rem; }
+  .intro { color: var(--muted); max-width: 60ch; margin: 1rem 0 1.5rem; }
+  .aviso { background: var(--warn-bg); color: var(--warn-ink); padding: .75rem 1rem;
+           border-left: 4px solid currentColor; max-width: 60ch; }
+  .control { margin: 1.5rem 0 .5rem; color: var(--muted); }
+  section { display: grid; grid-template-columns: 1fr; gap: 1.25rem;
+            padding: 2rem 0; border-top: 1px solid var(--line); }
+  @media (min-width: 52rem) { section { grid-template-columns: 17rem 1fr; gap: 2.5rem; } }
+  .valor { font: 700 2.4rem/1 "Newsreader", Georgia, serif; color: var(--accent); margin: .75rem 0 .25rem; }
+  .nota { font-size: .875rem; color: var(--muted); }
+  .nota a { color: inherit; }
+  .lienzo { position: relative; height: 18rem; }
+  footer { border-top: 1px solid var(--line); padding-top: 1.5rem; color: var(--muted); font-size: .875rem; max-width: 60ch; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cómo van los indicadores del país</h1>
+  <p class="intro">Tres series con la misma estructura: un dato, su fuente, su fecha de corte y una nota de metodología.</p>
+  <p class="aviso"><strong>Datos en construcción.</strong> La inflación viene del INEGI cuando existe el archivo de datos. Empleo formal y homicidios dolosos siguen siendo datos de muestra inventados; su fecha de corte lo indica.</p>
+
+  <label class="control">
+    <input type="checkbox" id="desdeCero"> Mostrar el eje vertical desde cero
+  </label>
+
+  <div id="indicadores"></div>
+
+  <footer>
+    Las cifras de seguridad reflejan delitos denunciados, no todos los delitos ocurridos. Los datos pueden ser reclasificados por la fuente.
+  </footer>
+</main>
+
+<script>
+/* ---------- 1. DATOS ----------
+   Aquí viven los datos. Más adelante los moverás a un archivo JSON
+   que un proceso automático actualice. Todo lo de abajo es de MUESTRA. */
+const MESES = ["2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12",
+               "2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12"];
+
+const INDICADORES = [
+  { id: "inflacion", titulo: "Inflación anual", unidad: "%", decimales: 1,
+    descripcion: "Cambio porcentual del índice de precios al consumidor contra el mismo mes del año anterior.",
+    fuente: "INEGI, INPC", enlace: "https://www.inegi.org.mx/temas/inpc/", corte: "diciembre 2025 (muestra)",
+    serie: [4.9,4.4,4.6,4.7,4.7,5.0,5.6,5.0,4.6,4.8,4.6,4.2,3.6,3.8,3.8,3.9,4.4,4.3,3.5,3.6,3.8,3.6,3.8,3.7] },
+  { id: "empleo", titulo: "Empleo formal", unidad: " millones", decimales: 1,
+    descripcion: "Personas aseguradas en el IMSS. Mide empleo formal, no el total de ocupados.",
+    fuente: "IMSS", enlace: "https://www.imss.gob.mx/estadisticas", corte: "diciembre 2025 (muestra)",
+    serie: [22.3,22.4,22.5,22.5,22.5,22.5,22.6,22.6,22.6,22.6,22.7,22.4,22.4,22.5,22.6,22.6,22.6,22.6,22.7,22.7,22.7,22.7,22.8,22.5] },
+  { id: "homicidios", titulo: "Homicidios dolosos", unidad: " víctimas al mes", decimales: 0,
+    descripcion: "Víctimas reportadas por las fiscalías estatales. Solo cuenta lo denunciado o investigado.",
+    fuente: "SESNSP", enlace: "https://www.gob.mx/sesnsp/acciones-y-programas/datos-abiertos-de-incidencia-delictiva", corte: "diciembre 2025 (muestra)",
+    serie: [2400,2250,2300,2250,2300,2200,2200,2150,2100,2150,2050,2100,2000,1900,1950,1850,1800,1750,1700,1700,1650,1650,1600,1650] }
+];
+
+/* ---------- 2. PÁGINA ---------- */
+const nf = (n, d) => n.toLocaleString("es-MX", { minimumFractionDigits: d, maximumFractionDigits: d });
+const cont = document.getElementById("indicadores");
+const graficas = [];
+
+/* "2025-03" -> "marzo de 2025" */
+const nombreMes = ym => {
+  const [a, m] = ym.split("-");
+  return new Date(a, m - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+};
+
+/* Línea vertical que sigue al mouse para ubicar el mes */
+const guia = {
+  id: "guia",
+  afterDatasetsDraw(chart) {
+    const activos = chart.tooltip && chart.tooltip.getActiveElements();
+    if (!activos || !activos.length) return;
+    const x = activos[0].element.x, { top, bottom } = chart.chartArea, ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom);
+    ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted").trim();
+    ctx.stroke(); ctx.restore();
+  }
+};
+
+function pintar() {
+INDICADORES.forEach(ind => {
+  const ultimo = ind.serie[ind.serie.length - 1];
+  const sec = document.createElement("section");
+  sec.innerHTML = `
+    <div>
+      <h2>${ind.titulo}</h2>
+      <p class="valor">${nf(ultimo, ind.decimales)}<span class="nota">${ind.unidad}</span></p>
+      <p class="nota">${ind.descripcion}</p>
+      <p class="nota">Fuente: <a href="${ind.enlace}" target="_blank" rel="noopener">${ind.fuente}</a>. Corte: ${ind.corte}.</p>
+    </div>
+    <div class="lienzo"><canvas id="c-${ind.id}" role="img" aria-label="Gráfica de ${ind.titulo}"></canvas></div>`;
+  cont.appendChild(sec);
+
+  const color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  const g = new Chart(document.getElementById("c-" + ind.id), {
+    type: "line",
+    plugins: [guia],
+    data: { labels: ind.meses || MESES, datasets: [{ data: ind.serie, borderColor: color, backgroundColor: color,
+                                        borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, tension: .25 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false },
+                 tooltip: { displayColors: false, padding: 10,
+                            callbacks: { title: it => nombreMes(it[0].label),
+                                         label: c => nf(c.parsed.y, ind.decimales) + ind.unidad } } },
+      scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } },
+                y: { beginAtZero: false } }
+    }
+  });
+  graficas.push(g);
+});
+}
+
+/* Si existe data/datos.json (lo genera actualizar_datos.py), reemplaza la inflación de muestra */
+async function cargarReales() {
+  try {
+    const r = await fetch("data/datos.json", { cache: "no-store" });
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.inflacion) Object.assign(INDICADORES.find(x => x.id === "inflacion"), d.inflacion);
+  } catch (e) { console.warn("Sin datos reales; se usan los de muestra.", e); }
+}
+cargarReales().then(pintar);
+
+/* Al marcar la casilla, el eje Y pasa a empezar en cero */
+document.getElementById("desdeCero").addEventListener("change", e => {
+  graficas.forEach(g => { g.options.scales.y.beginAtZero = e.target.checked; g.update(); });
+});
+</script>
+</body>
+</html>
