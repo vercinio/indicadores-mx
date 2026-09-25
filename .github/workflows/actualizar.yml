@@ -2,10 +2,12 @@ name: Actualizar datos de indicadores
 
 on:
   schedule:
-    # 13:00 UTC = 7:00 hora de Ciudad de México (CST) — el INEGI publica el 10 y el 25.
-    # Se corre un día después de cada fecha de publicación, por si hay retraso.
-    - cron: "0 13 11 * *"
-    - cron: "0 13 26 * *"
+    # El INEGI difunde el dato mensual completo entre el día 7 y el 9 de cada
+    # mes, a las 6:00 a.m. hora de Ciudad de México (UTC-6, todo el año).
+    # Corremos TODOS los días a las 7:00 a.m. CDMX (13:00 UTC): si no hay
+    # dato nuevo, el paso "Publicar el dato nuevo" no hace ningún commit,
+    # así que no cuesta nada tenerlo corriendo a diario.
+    - cron: "0 13 * * *"
   workflow_dispatch: {}   # permite lanzarlo a mano desde la pestaña Actions, para probar
 
 permissions:
