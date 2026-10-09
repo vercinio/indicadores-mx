@@ -67,6 +67,10 @@ const INDICADORES = [
     descripcion: "Cambio porcentual del índice de precios al consumidor contra el mismo mes del año anterior.",
     fuente: "INEGI, INPC", enlace: "https://www.inegi.org.mx/temas/inpc/", corte: "diciembre 2025 (muestra)",
     serie: [4.9,4.4,4.6,4.7,4.7,5.0,5.6,5.0,4.6,4.8,4.6,4.2,3.6,3.8,3.8,3.9,4.4,4.3,3.5,3.6,3.8,3.6,3.8,3.7] },
+  { id: "desocupacion", titulo: "Tasa de desocupación", unidad: "%", decimales: 1,
+    descripcion: "Personas sin trabajo que lo buscaron activamente en el mes, como % de la población económicamente activa. No incluye a quien dejó de buscar, ni mide la calidad del empleo de quien sí trabaja. La línea sólida es el dato tal como se publica cada mes (se compara contra el mismo mes del año anterior); la punteada quita el patrón que se repite cada año, para poder comparar contra el mes inmediato anterior.",
+    fuente: "INEGI, ENOE", enlace: "https://www.inegi.org.mx/programas/enoe/15ymas/", corte: "agosto 2025 (muestra)",
+    serie: [2.9,2.9,3.0,2.9,2.8,2.8,2.9,2.9,3.0,3.1,3.0,2.9,2.8,2.7,2.7,2.8,2.8,2.9,2.9,3.0,3.0,2.9,2.8,2.9] },
   { id: "empleo", titulo: "Empleo formal", unidad: " millones", decimales: 1,
     descripcion: "Personas aseguradas en el IMSS. Mide empleo formal, no el total de ocupados.",
     fuente: "IMSS", enlace: "https://www.imss.gob.mx/estadisticas", corte: "diciembre 2025 (muestra)",
@@ -118,18 +122,31 @@ INDICADORES.forEach(ind => {
   cont.appendChild(sec);
 
   const color = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  const muted = getComputedStyle(document.documentElement).getPropertyValue("--muted").trim();
+  const tieneSegunda = Array.isArray(ind.serie_desestacionalizada);
+
+  const datasets = [{ label: tieneSegunda ? "Original" : undefined, data: ind.serie,
+                      borderColor: color, backgroundColor: color, borderWidth: 2.5,
+                      pointRadius: 0, pointHoverRadius: 5, tension: .25, spanGaps: true }];
+  if (tieneSegunda) {
+    datasets.push({ label: "Desestacionalizada", data: ind.serie_desestacionalizada,
+                     borderColor: muted, backgroundColor: muted, borderWidth: 2,
+                     borderDash: [5, 3], pointRadius: 0, pointHoverRadius: 5, tension: .25, spanGaps: true });
+  }
+
   const g = new Chart(document.getElementById("c-" + ind.id), {
     type: "line",
     plugins: [guia],
-    data: { labels: ind.meses || MESES, datasets: [{ data: ind.serie, borderColor: color, backgroundColor: color,
-                                        borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5, tension: .25 }] },
+    data: { labels: ind.meses || MESES, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
-      plugins: { legend: { display: false },
-                 tooltip: { displayColors: false, padding: 10,
+      plugins: { legend: { display: tieneSegunda, position: "top", align: "end",
+                            labels: { boxWidth: 20, usePointStyle: false } },
+                 tooltip: { padding: 10,
                             callbacks: { title: it => nombreMes(it[0].label),
-                                         label: c => nf(c.parsed.y, ind.decimales) + ind.unidad } } },
+                                         label: c => `${c.dataset.label ? c.dataset.label + ": " : ""}` +
+                                                      (c.parsed.y == null ? "sin dato" : nf(c.parsed.y, ind.decimales) + ind.unidad) } } },
       scales: { x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } },
                 y: { beginAtZero: false } }
     }
@@ -144,7 +161,10 @@ async function cargarReales() {
     const r = await fetch("data/datos.json", { cache: "no-store" });
     if (!r.ok) return;
     const d = await r.json();
-    if (d.inflacion) Object.assign(INDICADORES.find(x => x.id === "inflacion"), d.inflacion);
+    for (const id in d) {
+      const ind = INDICADORES.find(x => x.id === id);
+      if (ind) Object.assign(ind, d[id]);
+    }
   } catch (e) { console.warn("Sin datos reales; se usan los de muestra.", e); }
 }
 cargarReales().then(pintar);
