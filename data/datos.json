@@ -246,7 +246,7 @@
   ],
   "decimales": 2,
   "corte": "septiembre 2026",
-  "actualizado": "2026-10-23"
+  "actualizado": "2026-10-24"
  },
  "desocupacion": {
   "meses": [
@@ -617,6 +617,6 @@
   ],
   "decimales": 1,
   "corte": "septiembre 2026",
-  "actualizado": "2026-10-23"
+  "actualizado": "2026-10-24"
  }
 }
